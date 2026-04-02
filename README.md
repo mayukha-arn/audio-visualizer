@@ -39,49 +39,6 @@ Select a mode from the panel at the bottom of the screen.
 
 ---
 
-## How to Deploy on GitHub Pages
-
-GitHub Pages serves the file over HTTPS, which is required for microphone access in modern browsers. This is the recommended way to run the project.
-
-### Step 1 — Rename the file
-
-Before uploading, rename `voice_flower_visualizer.html` to `index.html`. GitHub Pages will serve this as the root page automatically.
-
-### Step 2 — Create a GitHub repository
-
-1. Go to [github.com](https://github.com) and sign in
-2. Click the **+** icon in the top right and select **New repository**
-3. Give it a name (e.g. `bloom-visualizer`)
-4. Set visibility to **Public**
-5. Click **Create repository**
-
-### Step 3 — Upload the file
-
-On the new repository page:
-
-1. Click **uploading an existing file**
-2. Drag and drop `index.html` into the upload area
-3. Scroll down and click **Commit changes**
-
-### Step 4 — Enable GitHub Pages
-
-1. Go to the repository's **Settings** tab
-2. In the left sidebar, click **Pages**
-3. Under **Branch**, select `main` and leave the folder as `/ (root)`
-4. Click **Save**
-
-### Step 5 — Open the live site
-
-After about 30–60 seconds, GitHub Pages will publish the site. Your URL will be:
-
-```
-https://your-username.github.io/your-repo-name/
-```
-
-GitHub shows the exact URL at the top of the Pages settings page once it is live. Open it in Chrome or Firefox, click the mic button, and allow microphone access when prompted.
-
----
-
 ## Browser Requirements
 
 - **Chrome** (recommended) or **Firefox**
