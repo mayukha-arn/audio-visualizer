@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom — Voice Flower Visualizer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --lavender:  #E5D9F2;
+    --violet:    #A594F9;
+    --indigo:    #7371FC;
+    --charcoal:  #595758;
+    --mint:      #E8F8C1;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Cormorant Garamond', serif;
+    background: var(--charcoal);
+    color: var(--lavender);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Dynamic BG ── */
+  #bg {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 20% 30%, #3a3466 0%, transparent 55%),
+                radial-gradient(ellipse at 80% 70%, #2a2a3a 0%, transparent 55%),
+                var(--charcoal);
+    transition: background 1.2s ease;
+  }
+  #bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 40px,
+      rgba(229,217,242,.018) 40px, rgba(229,217,242,.018) 41px
+    ),
+    repeating-linear-gradient(
+      90deg, transparent, transparent 40px,
+      rgba(229,217,242,.018) 40px, rgba(229,217,242,.018) 41px
+    );
+  }
+
+  /* ── Canvas ── */
+  #canvas {
+    position: fixed; inset: 0; z-index: 1;
+    width: 100%; height: 100%;
+  }
+
+  /* ── UI Shell ── */
+  #ui {
+    position: relative; z-index: 10;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    pointer-events: none;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 24px 36px 0;
+  }
+
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    color: var(--lavender);
+  }
+  h1 span { color: var(--violet); font-style: italic; }
+
+  .tagline {
+    font-family: 'Space Mono', monospace;
+    font-size: .6rem;
+    letter-spacing: .18em;
+    color: var(--violet);
+    opacity: .7;
+    text-transform: uppercase;
+  }
+
+  /* ── Bottom Panel ── */
+  #panel {
+    margin-top: auto;
+    padding: 20px 36px 28px;
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+    pointer-events: all;
+    flex-wrap: wrap;
+  }
+
+  /* Mic button */
+  #micBtn {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 2px solid var(--violet);
+    background: rgba(115,113,252,.12);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .3s, border-color .3s, box-shadow .3s;
+    flex-shrink: 0;
+  }
+  #micBtn:hover { background: rgba(115,113,252,.25); }
+  #micBtn.active {
+    background: rgba(115,113,252,.35);
+    border-color: var(--mint);
+    box-shadow: 0 0 24px rgba(232,248,193,.4);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 24px rgba(232,248,193,.4); }
+    50%      { box-shadow: 0 0 48px rgba(232,248,193,.7); }
+  }
+  #micBtn svg { width: 28px; height: 28px; }
+
+  /* Flower type selector */
+  .flower-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .flower-selector label {
+    font-family: 'Space Mono', monospace;
+    font-size: .55rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--violet);
+    opacity: .8;
+  }
+  .flower-btns {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .ftype {
+    font-family: 'Space Mono', monospace;
+    font-size: .6rem;
+    padding: 6px 14px;
+    border: 1px solid rgba(165,148,249,.4);
+    border-radius: 20px;
+    background: rgba(165,148,249,.08);
+    color: var(--lavender);
+    cursor: pointer;
+    transition: background .2s, border-color .2s, color .2s;
+    letter-spacing: .1em;
+  }
+  .ftype:hover { background: rgba(165,148,249,.2); }
+  .ftype.sel {
+    background: rgba(115,113,252,.45);
+    border-color: var(--mint);
+    color: var(--mint);
+  }
+
+  /* Freq bars */
+  #freqPanel {
+    display: flex; flex-direction: column; gap: 5px;
+    flex: 1; min-width: 180px; max-width: 320px;
+  }
+  .freq-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .freq-label {
+    font-family: 'Space Mono', monospace;
+    font-size: .5rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--violet);
+    width: 50px; flex-shrink: 0;
+  }
+  .freq-bar-bg {
+    flex: 1; height: 4px;
+    background: rgba(165,148,249,.15);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .freq-bar-fill {
+    height: 100%; width: 0%;
+    border-radius: 2px;
+    transition: width .05s;
+  }
+
+  /* Status */
+  #status {
+    font-family: 'Space Mono', monospace;
+    font-size: .55rem;
+    letter-spacing: .12em;
+    color: var(--violet);
+    opacity: .7;
+    align-self: flex-end;
+    padding-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  /* Pitch / Volume readout */
+  #readout {
+    display: flex; flex-direction: column; gap: 4px;
+    align-items: flex-end;
+  }
+  .read-label {
+    font-family: 'Space Mono', monospace;
+    font-size: .5rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--violet);
+    opacity: .7;
+  }
+  .read-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 1.4rem;
+    color: var(--lavender);
+    line-height: 1;
+  }
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+<canvas id="canvas"></canvas>
+
+<div id="ui">
+  <header>
+    <h1>Bl<span>oo</span>m</h1>
+    <span class="tagline">Voice Flower Visualizer</span>
+  </header>
+
+  <div id="panel">
+    <!-- Mic -->
+    <button id="micBtn" title="Activate microphone" aria-label="Activate microphone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round" style="color:var(--lavender)">
+        <rect x="9" y="2" width="6" height="12" rx="3"/>
+        <path d="M5 10a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+        <line x1="8"  y1="22" x2="16" y2="22"/>
+      </svg>
+    </button>
+
+    <!-- Flower type -->
+    <div class="flower-selector">
+      <label>Flower Type</label>
+      <div class="flower-btns">
+        <button class="ftype sel" data-type="rose">Rose</button>
+        <button class="ftype" data-type="daisy">Daisy</button>
+        <button class="ftype" data-type="lotus">Lotus</button>
+        <button class="ftype" data-type="spiral">Spiral</button>
+        <button class="ftype" data-type="auto">Auto</button>
+      </div>
+    </div>
+
+    <!-- Freq bars -->
+    <div id="freqPanel">
+      <div class="freq-row">
+        <span class="freq-label">Bass</span>
+        <div class="freq-bar-bg"><div class="freq-bar-fill" id="b-bass"  style="background:var(--indigo)"></div></div>
+      </div>
+      <div class="freq-row">
+        <span class="freq-label">Low Mid</span>
+        <div class="freq-bar-bg"><div class="freq-bar-fill" id="b-lowmid" style="background:var(--violet)"></div></div>
+      </div>
+      <div class="freq-row">
+        <span class="freq-label">Mid</span>
+        <div class="freq-bar-bg"><div class="freq-bar-fill" id="b-mid"   style="background:var(--lavender)"></div></div>
+      </div>
+      <div class="freq-row">
+        <span class="freq-label">Hi Mid</span>
+        <div class="freq-bar-bg"><div class="freq-bar-fill" id="b-himid" style="background:var(--mint)"></div></div>
+      </div>
+      <div class="freq-row">
+        <span class="freq-label">Treble</span>
+        <div class="freq-bar-bg"><div class="freq-bar-fill" id="b-treble" style="background:#fff"></div></div>
+      </div>
+    </div>
+
+    <!-- Status + readout -->
+    <div style="display:flex;flex-direction:column;gap:12px;margin-left:auto">
+      <div id="readout">
+        <span class="read-label">Volume</span>
+        <span class="read-val" id="volVal">—</span>
+        <span class="read-label" style="margin-top:6px">Pitch</span>
+        <span class="read-val" id="pitchVal">—</span>
+      </div>
+      <span id="status">Mic off</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  AUDIO ENGINE
+// ═══════════════════════════════════════════════
+let audioCtx, analyser, dataArray, source;
+let micActive = false;
+const FFT = 2048;
+
+async function startMic() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT;
+  analyser.smoothingTimeConstant = 0.8;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+  micActive = true;
+}
+
+function getFreqBands() {
+  if (!analyser) return { bass:0, lowmid:0, mid:0, himid:0, treble:0, volume:0 };
+  analyser.getByteFrequencyData(dataArray);
+  const sr = audioCtx.sampleRate, bins = analyser.frequencyBinCount;
+  const toIdx = hz => Math.round(hz / (sr/2) * bins);
+
+  const avg = (lo, hi) => {
+    let s = 0, n = 0;
+    for (let i = toIdx(lo); i < Math.min(toIdx(hi), bins); i++) { s += dataArray[i]; n++; }
+    return n ? s / n / 255 : 0;
+  };
+
+  const bass   = avg(20, 250);
+  const lowmid = avg(250, 500);
+  const mid    = avg(500, 2000);
+  const himid  = avg(2000, 4000);
+  const treble = avg(4000, 20000);
+  const volume = avg(20, 20000);
+  return { bass, lowmid, mid, himid, treble, volume };
+}
+
+// ═══════════════════════════════════════════════
+//  CANVAS + DRAWING
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Color palette
+const PAL = {
+  lavender: '#E5D9F2',
+  violet:   '#A594F9',
+  indigo:   '#7371FC',
+  charcoal: '#595758',
+  mint:     '#E8F8C1',
+};
+
+// Flower type state
+let flowerType = 'rose';
+let autoTimer = 0;
+const TYPES = ['rose','daisy','lotus','spiral'];
+
+document.querySelectorAll('.ftype').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ftype').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    flowerType = btn.dataset.type;
+  });
+});
+
+// ── Flowers ──────────────────────────────────
+function drawRose(cx, cy, r, petals, twist, vol, bands) {
+  // Rose: rhodonea curve — r = a·cos(k·θ)
+  const k = Math.max(2, Math.round(petals)); // petals
+  const wobble = 1 + bands.treble * 0.5;
+  ctx.beginPath();
+  for (let i = 0; i <= 720; i++) {
+    const t = (i / 720) * Math.PI * 4;
+    const ro = (r * Math.cos(k * t) * wobble) + bands.himid * 30 * Math.sin(t * 3);
+    const x = cx + ro * Math.cos(t + twist);
+    const y = cy + ro * Math.sin(t + twist);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0, colorAlpha(PAL.lavender, 0.9));
+  grad.addColorStop(0.5, colorAlpha(PAL.violet, 0.7));
+  grad.addColorStop(1, colorAlpha(PAL.indigo, 0.3 + vol * 0.4));
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Outline
+  ctx.strokeStyle = colorAlpha(PAL.mint, 0.4 + bands.treble * 0.5);
+  ctx.lineWidth = 1 + vol * 2;
+  ctx.stroke();
+}
+
+function drawDaisy(cx, cy, r, petals, twist, vol, bands) {
+  const np = Math.max(4, Math.round(petals));
+  const petalR = r * (0.5 + bands.mid * 0.6);
+  const petalW = r * (0.3 + bands.bass * 0.3);
+
+  for (let i = 0; i < np; i++) {
+    const ang = (i / np) * Math.PI * 2 + twist;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+
+    // Petal shape via ellipse
+    ctx.beginPath();
+    ctx.ellipse(petalR * 0.5, 0, petalR * 0.5 + bands.himid*20, petalW * 0.5, 0, 0, Math.PI * 2);
+
+    const hue = 270 + i * (60 / np);
+    ctx.fillStyle = colorAlpha(
+      i % 2 === 0 ? PAL.lavender : PAL.violet,
+      0.55 + vol * 0.4
+    );
+    ctx.fill();
+    ctx.strokeStyle = colorAlpha(PAL.mint, 0.35);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Center disk
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.18 + bands.bass * 20, 0, Math.PI * 2);
+  const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.18 + bands.bass*20);
+  cg.addColorStop(0, PAL.mint);
+  cg.addColorStop(1, colorAlpha(PAL.indigo, 0.8));
+  ctx.fillStyle = cg;
+  ctx.fill();
+}
+
+function drawLotus(cx, cy, r, petals, twist, vol, bands) {
+  const np = Math.max(4, Math.round(petals));
+  const layers = 3;
+
+  for (let l = layers; l >= 1; l--) {
+    const lr = r * (l / layers);
+    const lnp = np + (layers - l);
+    const spread = (1 - l / (layers + 1)) * 0.7 + vol * 0.3;
+
+    for (let i = 0; i < lnp; i++) {
+      const ang = (i / lnp) * Math.PI * 2 + twist + l * 0.3;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+
+      // Pointed petal
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      const w = lr * (0.2 + bands.bass * 0.15);
+      const h = lr * (0.7 + bands.mid * 0.4 + spread * 0.3);
+      ctx.bezierCurveTo(-w, h * 0.3, -w * 0.5, h, 0, h);
+      ctx.bezierCurveTo( w * 0.5, h,  w, h * 0.3, 0, 0);
+
+      const alpha = 0.4 + (l / layers) * 0.4;
+      const colors = [PAL.indigo, PAL.violet, PAL.lavender];
+      ctx.fillStyle = colorAlpha(colors[l-1] || PAL.lavender, alpha + vol * 0.25);
+      ctx.fill();
+      ctx.strokeStyle = colorAlpha(PAL.mint, 0.25);
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Stamen glow
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.12 + bands.himid * 15, 0, Math.PI * 2);
+  ctx.fillStyle = colorAlpha(PAL.mint, 0.8 + vol * 0.2);
+  ctx.fill();
+}
+
+function drawSpiral(cx, cy, r, petals, twist, vol, bands) {
+  const arms = Math.max(2, Math.round(petals * 0.6));
+  const turns = 3 + bands.mid * 4;
+
+  for (let a = 0; a < arms; a++) {
+    const offset = (a / arms) * Math.PI * 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 300; i++) {
+      const t = (i / 300) * Math.PI * 2 * turns;
+      const ro = (t / (Math.PI * 2 * turns)) * r * (1 + bands.bass * 0.4);
+      const x = cx + ro * Math.cos(t + offset + twist);
+      const y = cy + ro * Math.sin(t + offset + twist);
+      // Add voice wobble
+      const wx = x + bands.himid * 18 * Math.sin(t * 4 + offset);
+      const wy = y + bands.himid * 18 * Math.cos(t * 4 + offset);
+      i === 0 ? ctx.moveTo(wx, wy) : ctx.lineTo(wx, wy);
+    }
+    ctx.strokeStyle = colorAlpha(
+      a % 2 === 0 ? PAL.violet : PAL.mint,
+      0.5 + vol * 0.45
+    );
+    ctx.lineWidth = 1 + bands.treble * 3 + vol * 2;
+    ctx.stroke();
+  }
+
+  // Center
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.07 + vol * 15, 0, Math.PI * 2);
+  ctx.fillStyle = colorAlpha(PAL.lavender, 0.9);
+  ctx.fill();
+}
+
+// ── Particles ──────────────────────────────
+const particles = [];
+function spawnParticle(cx, cy, vol, bands) {
+  if (vol < 0.04 || Math.random() > vol * 0.6) return;
+  const ang = Math.random() * Math.PI * 2;
+  const spd = 0.5 + Math.random() * 2 + vol * 3;
+  particles.push({
+    x: cx + (Math.random() - 0.5) * 40,
+    y: cy + (Math.random() - 0.5) * 40,
+    vx: Math.cos(ang) * spd,
+    vy: Math.sin(ang) * spd - 0.5,
+    life: 1,
+    decay: 0.008 + Math.random() * 0.015,
+    r: 1 + Math.random() * 3 + bands.treble * 4,
+    color: [PAL.lavender, PAL.violet, PAL.mint][Math.floor(Math.random()*3)],
+  });
+}
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.03; // gravity
+    p.life -= p.decay;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+    ctx.fillStyle = colorAlpha(p.color, p.life * 0.7);
+    ctx.fill();
+  }
+}
+
+// ── Background pulse ───────────────────────
+let bgHue = 260;
+function updateBG(vol, bass) {
+  const bg = document.getElementById('bg');
+  const shift = bass * 30;
+  const brightness = 15 + vol * 12;
+  bg.style.background = `
+    radial-gradient(ellipse at 20% 30%, hsl(${bgHue + shift},40%,${brightness}%) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 70%, hsl(${bgHue - shift + 20},30%,${brightness*0.7}%) 0%, transparent 55%),
+    var(--charcoal)`;
+  bgHue += 0.04;
+}
+
+// ── Helpers ────────────────────────────────
+function colorAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Freq bar DOM update ────────────────────
+const barEls = {
+  bass:   document.getElementById('b-bass'),
+  lowmid: document.getElementById('b-lowmid'),
+  mid:    document.getElementById('b-mid'),
+  himid:  document.getElementById('b-himid'),
+  treble: document.getElementById('b-treble'),
+};
+function updateBars(bands) {
+  barEls.bass.style.width   = (bands.bass   * 100) + '%';
+  barEls.lowmid.style.width = (bands.lowmid * 100) + '%';
+  barEls.mid.style.width    = (bands.mid    * 100) + '%';
+  barEls.himid.style.width  = (bands.himid  * 100) + '%';
+  barEls.treble.style.width = (bands.treble * 100) + '%';
+
+  document.getElementById('volVal').textContent   = micActive ? Math.round(bands.volume * 100) + '%' : '—';
+  document.getElementById('pitchVal').textContent = micActive ? Math.round(bands.mid * 4000) + ' Hz' : '—';
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════
+let twist = 0;
+let smoothVol = 0;
+let smoothBands = { bass:0, lowmid:0, mid:0, himid:0, treble:0 };
+let idleTime = 0;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function frame() {
+  requestAnimationFrame(frame);
+
+  const raw = getFreqBands();
+  // Smooth
+  const sp = micActive ? 0.15 : 0.05;
+  smoothVol = lerp(smoothVol, raw.volume, sp);
+  for (const k in smoothBands) smoothBands[k] = lerp(smoothBands[k], raw[k] || 0, sp);
+
+  const vol = smoothVol;
+  const bands = smoothBands;
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // Idle ghost flowers
+  if (!micActive || vol < 0.01) {
+    idleTime += 0.008;
+    drawIdleFlowers(idleTime);
+  } else {
+    idleTime = 0;
+  }
+
+  // Determine flower
+  let type = flowerType;
+  if (type === 'auto') {
+    autoTimer += 0.004;
+    type = TYPES[Math.floor(autoTimer) % TYPES.length];
+  }
+
+  // Main flower
+  const cx = W / 2, cy = H / 2;
+  const baseR = Math.min(W, H) * 0.26;
+  const r = baseR + vol * baseR * 0.7 + bands.bass * 60;
+  const petals = 5 + Math.round(bands.mid * 8) + Math.round(bands.himid * 4);
+
+  twist += 0.003 + vol * 0.04 + bands.bass * 0.02;
+
+  if (type === 'rose')   drawRose  (cx, cy, r, petals, twist, vol, bands);
+  if (type === 'daisy')  drawDaisy (cx, cy, r, petals, twist, vol, bands);
+  if (type === 'lotus')  drawLotus (cx, cy, r, petals, twist, vol, bands);
+  if (type === 'spiral') drawSpiral(cx, cy, r, petals, twist, vol, bands);
+
+  // Particles
+  spawnParticle(cx, cy, vol, bands);
+  updateParticles();
+
+  // UI
+  updateBG(vol, bands.bass);
+  updateBars(bands);
+}
+
+// Idle animation — gentle ghost flowers
+function drawIdleFlowers(t) {
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W,H)*0.22;
+  ctx.globalAlpha = 0.18 + 0.06 * Math.sin(t * 1.5);
+
+  // Soft rose behind
+  ctx.beginPath();
+  for (let i = 0; i <= 720; i++) {
+    const ang = (i/720)*Math.PI*4;
+    const ro = r * Math.cos(4*ang);
+    const x = cx + ro * Math.cos(ang + t);
+    const y = cy + ro * Math.sin(ang + t);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  const g = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+  g.addColorStop(0, PAL.lavender);
+  g.addColorStop(1, PAL.indigo);
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+}
+
+// ═══════════════════════════════════════════════
+//  MIC BUTTON
+// ═══════════════════════════════════════════════
+document.getElementById('micBtn').addEventListener('click', async function() {
+  if (!micActive) {
+    try {
+      await startMic();
+      this.classList.add('active');
+      document.getElementById('status').textContent = 'Listening…';
+    } catch(e) {
+      document.getElementById('status').textContent = 'Mic denied';
+      console.error(e);
+    }
+  } else {
+    // Toggle off
+    if (source) source.disconnect();
+    if (audioCtx) audioCtx.close();
+    micActive = false;
+    analyser = null;
+    this.classList.remove('active');
+    document.getElementById('status').textContent = 'Mic off';
+  }
+});
+
+// Start loop
+frame();
+</script>
+</body>
+</html>
